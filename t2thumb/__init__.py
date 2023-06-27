@@ -1,1 +1,1 @@
-from t2tclient import T2TClient
+from .t2tclient import T2TClient
