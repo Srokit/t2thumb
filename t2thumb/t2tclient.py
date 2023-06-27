@@ -5,6 +5,8 @@ import numpy as np
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
+from .img_checker import ImgChecker
+
 BASE_URL = "https://www.tiktok.com"
 IMGS_XPATH = "//*[@id=\"main-content-explore_page\"]/div/div/div/div/div/div/div/a/div/div/img"
 
@@ -13,7 +15,8 @@ class T2TClient:
                  img_crop_to_size: tuple[int, int] = (300, 300),
                  img_size_out: tuple[int, int] = (100, 100),
                  tiktok_page: str = 'explore?',
-                 is_firefox: bool = True) -> None:
+                 is_firefox: bool = True,
+                 validate_imgs: bool = False) -> None:
         """Set up the client.
 
         Args:
@@ -25,6 +28,7 @@ class T2TClient:
         self._img_crop_to_size = img_crop_to_size
         self._img_size_out = img_size_out
         self._page = tiktok_page
+        self._validate_imgs = validate_imgs
 
         if is_firefox:
             opts = webdriver.FirefoxOptions()
@@ -39,7 +43,7 @@ class T2TClient:
         """
         self._sel_driver.get(f"{BASE_URL}/{self._page}")
         eles = self._sel_driver.find_elements(By.XPATH, IMGS_XPATH)
-        for ele in eles:
+        for i_ele, ele in enumerate(eles):
             data = ele.screenshot_as_png
             img = cv2.imdecode(
                 np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
@@ -47,6 +51,10 @@ class T2TClient:
             img = img[:self._img_crop_to_size[0], :self._img_crop_to_size[1]]
             # Resize image
             img = cv2.resize(img, self._img_size_out, cv2.INTER_CUBIC)
+            # Check image
+            if self._validate_imgs and not ImgChecker.validate(img):
+                print(f"Image[{i_ele}] failed validation")
+                continue
             yield cv2.imencode(".png", img)[1].tobytes()
 
     def _print_init_setup(self) -> None:
@@ -56,3 +64,4 @@ class T2TClient:
         print(f"  Cropping images to: {self._img_crop_to_size}")
         print(f"  Resizing images to: {self._img_size_out}")
         print(f"  Using {'Firefox' if isinstance(self._sel_driver, webdriver.Firefox) else 'Chrome'}")
+        print(f"  {'Not ' if not self._validate_imgs else ''}Validating images")
